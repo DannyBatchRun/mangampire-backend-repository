@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>org.altervista</groupId>
 	<artifactId>mangampire-storehouse-service</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1</version>
 	<name>mangampire-storehouse</name>
 	<description>Mangampire Example Project - Manga and Storehouse Database</description>
 	<properties>
