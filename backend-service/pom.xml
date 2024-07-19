@@ -9,7 +9,7 @@
 	</parent>
 	<groupId>org.altervista</groupId>
 	<artifactId>mangampire-backend-service</artifactId>
-	<version>0.0.1</version>
+	<version>1.0.0</version>
 	<name>mangampire</name>
 	<description>Mangampire Example Project - Backend Service</description>
 	<properties>
