@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>org.altervista</groupId>
-	<artifactId>mangampire-transaction</artifactId>
+	<artifactId>mangampire-transaction-service</artifactId>
 	<version>1.0.0</version>
-	<name>mangampire-transaction</name>
+	<name>mangampire-transaction-service</name>
 	<description>Mangampire Example Project - Client Transaction and Card Database</description>
 	<properties>
 		<java.version>17</java.version>
@@ -87,7 +87,7 @@
 						<image>openjdk:17-jdk-slim</image>
 					</from>
 					<to>
-						<image>mangampire-transaction</image>
+						<image>mangampire-transaction-service</image>
 						<tags>
 							<tag>${project.version}</tag>
 						</tags>
