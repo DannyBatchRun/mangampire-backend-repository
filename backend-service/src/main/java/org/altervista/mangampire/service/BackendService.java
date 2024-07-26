@@ -15,7 +15,8 @@ public interface BackendService {
     boolean addClientOnDatabase(EndpointRequest clientDatabase, Client client);
     Boolean controlIfClientOrMangaIfEmpty(Manga manga, Client client);
     Boolean loginToPlatform(EndpointRequest clientDatabase, RequestLogin requestLogin);
-    StringBuilder completeTransaction(SearchClient client, String cardNumber, EndpointRequest storehouseDatabase, EndpointRequest clientDatabase, Map<Client, List<Manga>> shoppingCartList);    boolean controlEnoughBalance(Card card, BigDecimal totalCart);
+    StringBuilder completeTransaction (SearchClient client, String cardNumber, EndpointRequest storehouseDatabase, EndpointRequest clientDatabase, EndpointRequest shoppingCartDatabase);
+    boolean controlEnoughBalance(Card card, BigDecimal totalCart);
     Manga getAMangaFromDatabase(EndpointRequest storehouseDatabase, SearchManga searchManga);
     Client getAClientFromDatabase(EndpointRequest clientDatabase, SearchClient searchClient);
     String getCardsOfTheClient(EndpointRequest clientDatabase);
@@ -24,4 +25,7 @@ public interface BackendService {
     Card takeACardFromDatabase(EndpointRequest clientDatabase);
     String checkIfEmailIsExisting(EndpointRequest endpointRequest, RequestLogin requestLogin);
     Client getClientByEmailFromDatabase(EndpointRequest clientDatabase, RequestLogin requestLogin);
+    boolean controlIfMangaIsOnStock(EndpointRequest storehouseDatabase, Manga manga);
+    String checkExistingCartOrCreateIt(EndpointRequest shoppingCartDatabase, Client client);
+    boolean addMangaToCart(EndpointRequest shoppingCartDatabase, Client client, Manga manga);
 }

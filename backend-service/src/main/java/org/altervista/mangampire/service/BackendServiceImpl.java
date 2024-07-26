@@ -71,13 +71,15 @@ public class BackendServiceImpl implements BackendService {
         }
     }
     @Override
-    public StringBuilder completeTransaction (SearchClient client, String cardNumber, EndpointRequest storehouseDatabase, EndpointRequest clientDatabase, Map<Client, List<Manga>> shoppingCartList) {
+    public StringBuilder completeTransaction (SearchClient client, String cardNumber, EndpointRequest storehouseDatabase, EndpointRequest clientDatabase, EndpointRequest shoppingCartDatabase) {
         StringBuilder message = new StringBuilder();
         BigDecimal totalCart = new BigDecimal("0.0");
         Card transactionCard; boolean isOnStock; boolean enoughCredit;
         clientDatabase.setRequest("/client/search?showPasswordToken=no");
         Client clientFound = getAClientFromDatabase(clientDatabase, client);
-        List<Manga> shoppingCartClient = shoppingCartList.get(clientFound);
+        shoppingCartDatabase.setRequest("/cart/search?idClient=" + clientFound.getIdClient());
+        String searchShoppingCart = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+        ShoppingCart shoppingCartClient = restTemplate.getForObject(searchShoppingCart, ShoppingCart.class);
         if(shoppingCartClient == null) {
             message.append(getRuntimeMessage("There is no manga to buy or client shopping cart was not found"));
             return message;
@@ -86,7 +88,8 @@ public class BackendServiceImpl implements BackendService {
             return message;
         }
         storehouseDatabase.setRequest("/stock/search");
-        for(Manga m : shoppingCartClient) {
+        List<Manga> mangaCartClient = shoppingCartClient.getManga();
+        for(Manga m : mangaCartClient) {
             System.out.println("Check if " + m.getName() + " Volume " + m.getVolume() + " is available on stock...");
             isOnStock = checkIfMangaIsOnStock(storehouseDatabase, m);
             if(isOnStock) {
@@ -107,8 +110,10 @@ public class BackendServiceImpl implements BackendService {
         } else {
             System.out.println("Transaction in progress...");
             storehouseDatabase.setRequest("/stock/remove");
-            finalizeTransaction(clientDatabase, storehouseDatabase, transactionCard, shoppingCartClient, totalCart);
-            shoppingCartList.entrySet().removeIf(entry -> entry.getKey().equals(clientFound));
+            finalizeTransaction(clientDatabase, storehouseDatabase, transactionCard, mangaCartClient, totalCart);
+            shoppingCartDatabase.setRequest("/cart/clear?idClient=" + clientFound.getIdClient());
+            String cartDeletionUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+            restTemplate.delete(cartDeletionUrl);
             message.append(getRuntimeMessage("Shopping cart of " + clientFound.getName() + " " + clientFound.getSurname() + " removed successfully from database"));
         }
         message.append(getRuntimeMessage("Shopping cart buyed successful and credit has been scaled. Card used " + cardNumber));
@@ -189,6 +194,49 @@ public class BackendServiceImpl implements BackendService {
             LOGGER.error("Error while retrieving stock: {}", e.getMessage());
             throw new RuntimeException("Error while retrieving stock", e);
         }
+    }
+    @Override
+    public boolean addMangaToCart(EndpointRequest shoppingCartDatabase, Client client, Manga manga) {
+        try {
+            boolean added = false;
+            shoppingCartDatabase.setRequest("/cart/add/manga?idClient=" + client.getIdClient());
+            String additionMangaUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+            String response = restTemplate.postForObject(additionMangaUrl, manga, String.class);
+            if(response.equalsIgnoreCase("Manga is added on Shopping Cart") ||
+                response.equalsIgnoreCase("Manga is already present on shopping cart. Increased quantity.")) {
+                added = true;
+            }
+            return added;
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                LOGGER.warn("Stock not found: {}", e.getResponseBodyAsString());
+            } else {
+                LOGGER.error("Error while retrieving stock: {} - {}", e.getStatusCode(), e.getStatusText());
+            }
+            throw e;
+        } catch (Exception e) {
+            LOGGER.error("Error while retrieving stock: {}", e.getMessage());
+            throw new RuntimeException("Error while retrieving stock", e);
+        }
+    }
+    @Override
+    public String checkExistingCartOrCreateIt(EndpointRequest shoppingCartDatabase, Client client) {
+        String message = "No Message";
+        shoppingCartDatabase.setRequest("/cart/search?idClient=" + client.getIdClient());
+        String searchUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+        String response = restTemplate.getForObject(searchUrl, String.class);
+        if(response.contains("Cart not found")) {
+            ShoppingCart shoppingCart = new ShoppingCart();
+            shoppingCart.setIdClient(client.getIdClient());
+            shoppingCart.setManga(new ArrayList<>());
+            shoppingCartDatabase.setRequest("/cart/add");
+            String additionUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+            response = restTemplate.postForObject(additionUrl, shoppingCart, String.class);
+            message = "Cart not found. Created for idClient " + client.getIdClient() + ".";
+        } else {
+            message = "Cart found for idClient " + client.getIdClient() + ".";
+        }
+        return message;
     }
     private void finalizeTransaction(EndpointRequest clientDatabase, EndpointRequest stockDatabase, Card card, List<Manga> manga, BigDecimal totalCart) {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -288,6 +336,25 @@ public class BackendServiceImpl implements BackendService {
     public String getCardsOfTheClient(EndpointRequest clientDatabase) {
         String clientUrl = clientDatabase.getEndpoint() + clientDatabase.getRequest();
         return restTemplate.getForObject(clientUrl, String.class);
+    }
+    @Override
+    public boolean controlIfMangaIsOnStock(EndpointRequest storehouseDatabase, Manga manga) {
+        boolean available = false;
+        storehouseDatabase.setRequest("/stock/in");
+        String urlRequest = storehouseDatabase.getEndpoint() + storehouseDatabase.getRequest();
+        String response = restTemplate.getForObject(urlRequest, String.class);
+        System.out.println(manga.getName() + manga.getVolume());
+        if(response.contains(manga.getName()) && response.contains(String.valueOf(manga.getVolume()))) {
+            available = true;
+        } else {
+            storehouseDatabase.setRequest("/stock/out");
+            urlRequest = storehouseDatabase.getEndpoint() + storehouseDatabase.getRequest();
+            response = restTemplate.getForObject(urlRequest, String.class);
+            if(response.contains(manga.getName()) && response.contains(String.valueOf(manga.getVolume()))) {
+                System.out.println("Manga " + manga.getName() + " Volume " + manga.getVolume() + " is not available");
+            }
+        }
+        return available;
     }
 
     public boolean addCardAndVerifyIfIsAdded(EndpointRequest clientDatabase, long idClient, Card card) {

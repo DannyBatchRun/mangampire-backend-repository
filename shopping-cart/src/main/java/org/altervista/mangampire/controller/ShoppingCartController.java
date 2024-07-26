@@ -3,6 +3,7 @@ package org.altervista.mangampire.controller;
 import org.altervista.mangampire.model.Manga;
 import org.altervista.mangampire.model.ShoppingCart;
 import org.altervista.mangampire.service.ShoppingCartService;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -23,9 +24,17 @@ public class ShoppingCartController {
         return ResponseEntity.ok().body(shoppingCarts.toString());
     }
     @GetMapping("/cart/search")
-    public ResponseEntity<String> getShoppingCartByIdClient(@Validated @RequestParam long idClient) {
+    public String getShoppingCartByIdClient(@Validated @RequestParam long idClient) {
         ShoppingCart cartFound = shoppingCartService.searchShoppingCartByIdClient(idClient);
-        return ResponseEntity.ok().body(cartFound.toString());
+        if (cartFound == null) {
+            JSONObject errorJson = new JSONObject();
+            errorJson.put("error", "Cart not found");
+            return errorJson.toString();
+        }
+        JSONObject json = new JSONObject();
+        json.put("idClient", cartFound.getIdClient());
+        json.put("manga", cartFound.getManga());
+        return json.toString();
     }
 
     @PostMapping("/cart/add")

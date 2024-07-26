@@ -1,6 +1,5 @@
 package org.altervista.mangampire.repository;
 
-import org.altervista.mangampire.model.Client;
 import org.altervista.mangampire.model.ShoppingCart;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Repository;
