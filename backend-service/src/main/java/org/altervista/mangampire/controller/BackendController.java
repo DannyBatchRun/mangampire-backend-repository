@@ -1,11 +1,7 @@
 package org.altervista.mangampire.controller;
 
+import org.altervista.mangampire.dto.*;
 import org.altervista.mangampire.model.*;
-import org.altervista.mangampire.dto.SearchManga;
-import org.altervista.mangampire.dto.EndpointRequest;
-import org.altervista.mangampire.dto.RequestLogin;
-import org.altervista.mangampire.dto.ShoppingCart;
-import org.altervista.mangampire.dto.SearchClient;
 import org.altervista.mangampire.service.BackendService;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +25,22 @@ public class BackendController {
     private EndpointRequest storehouseDatabase;
     @Autowired
     private EndpointRequest clientDatabase;
-
+    @Autowired
+    private EndpointRequest shoppingCartDatabase;
     @GetMapping("/health")
     public String getHealth() {
         return "Service is up and running";
     }
-
+    @PostConstruct
+    public void init() {
+        System.out.println("Initializing localhost for Patch Requests as default.");
+        storehouseDatabase.setEndpoint("http://localhost:8081");
+        clientDatabase.setEndpoint("http://localhost:8082");
+        shoppingCartDatabase.setEndpoint("http://localhost:5000");
+        System.out.println("Storehouse Database ---> " + storehouseDatabase.getEndpoint());
+        System.out.println("Client Database ---> " + clientDatabase.getEndpoint());
+        System.out.println("Shopping Cart Database ---> " + shoppingCartDatabase.getEndpoint());
+    }
     @PatchMapping("/storehouse/url")
     public ResponseEntity<String> setStorehouseDatabase(@Validated @RequestBody EndpointRequest endpointRequest) {
         storehouseDatabase.setEndpoint("http://" + endpointRequest.getEndpoint());
@@ -44,6 +51,11 @@ public class BackendController {
     public ResponseEntity<String> setClientDatabase(@Validated @RequestBody EndpointRequest endpointRequest) {
         clientDatabase.setEndpoint("http://" + endpointRequest.getEndpoint());
         return ResponseEntity.ok().body("Endpoint for Client Database setted");
+    }
+    @PatchMapping("/shopping-cart/url")
+    public ResponseEntity<String> setShoppingCartDatabase(@Validated @RequestBody EndpointRequest endpointRequest) {
+        clientDatabase.setEndpoint("http://" + endpointRequest.getEndpoint());
+        return ResponseEntity.ok().body("Endpoint for Shopping Cart Database setted");
     }
     @PostMapping("/client/add")
     public boolean addClientToDatabase(@Validated @RequestBody Client client) {
@@ -94,61 +106,52 @@ public class BackendController {
         return service.addCardAndVerifyIfIsAdded(clientDatabase, idClient, card);
     }
     @PostMapping("/cart/add")
-    public ResponseEntity<String> addToCart(@Validated @RequestBody ShoppingCart shoppingCart) {
+    public ResponseEntity<String> addToCart(@Validated @RequestBody SearchClientManga clientManga) {
         boolean alreadyAdded = false;
-        SearchClient client = shoppingCart.getClient();
-        SearchManga manga = shoppingCart.getManga();
         String message = "No Message";
         storehouseDatabase.setRequest("/manga/search");
         clientDatabase.setRequest("/client/search?showPasswordToken=no");
-        Manga mangaFound = service.getAMangaFromDatabase(storehouseDatabase, manga);
-        Client clientFound = service.getAClientFromDatabase(clientDatabase, client);
-        Boolean isClientOrMangaEmpty = service.controlIfClientOrMangaIfEmpty(mangaFound,clientFound);
+        Manga mangaFound = service.getAMangaFromDatabase(storehouseDatabase, clientManga.getManga());
+        Client clientFound = service.getAClientFromDatabase(clientDatabase, clientManga.getClient());
+        boolean isClientOrMangaEmpty = service.controlIfClientOrMangaIfEmpty(mangaFound,clientFound);
         if(isClientOrMangaEmpty) {
             message = "Client or manga was not found";
             return ResponseEntity.ok().body(message);
         }
-        if(!shoppingCartList.containsKey(clientFound)) {
-            List<Manga> mangaList = new ArrayList<>();
-            mangaFound.setQuantity(1);
-            mangaList.add(mangaFound);
-            shoppingCartList.put(clientFound, mangaList);
-            message = "Client not have a shopping cart. Created.\n" + clientFound + "\n" + mangaList;
+        boolean isMangaOnStock = service.controlIfMangaIsOnStock(storehouseDatabase, mangaFound);
+        if(isMangaOnStock) {
+            System.out.println(service.checkExistingCartOrCreateIt(shoppingCartDatabase, clientFound));
+            boolean added = service.addMangaToCart(shoppingCartDatabase,clientFound,mangaFound);
+            if(added) {
+                message = "Manga added for idClient " + clientFound.getIdClient();
+            } else {
+                message = "Something went wrong for addition manga. Retry.";
+            }
         } else {
-            List<Manga> existingMangaList = shoppingCartList.get(clientFound);
-            for(Manga m : existingMangaList) {
-                if (m.getName().equals(mangaFound.getName()) &&
-                    m.getVolume() == mangaFound.getVolume()) {
-                    message = "Client have already at least one of this manga. Increased quantity.\n";
-                    int newQuantity = m.getQuantity();
-                    newQuantity++;
-                    m.setQuantity(newQuantity);
-                    alreadyAdded = true;
-                }
-            }
-            if(!alreadyAdded) {
-                existingMangaList.add(mangaFound);
-                message = "Added manga on shopping cart.\n" + clientFound + "\n" + existingMangaList;
-            }
-            shoppingCartList.put(clientFound, existingMangaList);}
+            return ResponseEntity.ok().body("Manga is not available");
+        }
         return ResponseEntity.ok().body(message);
     }
-
     @PostMapping("/cart/search")
-    public List<Manga> getSingleCartClient(@Validated @RequestBody SearchClient client) {
+    public ShoppingCart getSingleCartClient(@Validated @RequestBody SearchClient client) {
         clientDatabase.setRequest("/client/search?showPasswordToken=no");
         Client clientFound = service.getAClientFromDatabase(clientDatabase, client);
-        List<Manga> mangaList = shoppingCartList.get(clientFound);
-        return shoppingCartList.get(clientFound);
+        shoppingCartDatabase.setRequest("/cart/search?idClient=" + clientFound.getIdClient());
+        return service.getAShoppingCartFromDatabase(shoppingCartDatabase);
     }
-
-    @GetMapping("/cart/all")
-    public Map<Client, List<Manga>> showAllCarts() {
-        return shoppingCartList;
+    @GetMapping("/cart/clear")
+    public Boolean clearSingleCartClient(@Validated @RequestParam long idClient) {
+        Boolean cleared = Boolean.FALSE;
+        shoppingCartDatabase.setRequest("/cart/clear?idClient=" + idClient);
+        String response = service.clearCartClient(shoppingCartDatabase, idClient);
+        if(response.equalsIgnoreCase("All elements in cart are deleted")) {
+            cleared = Boolean.TRUE;
+        }
+        return cleared;
     }
     @PostMapping("/transaction/complete")
     public ResponseEntity<StringBuilder> buyAManga(@Validated @RequestParam String cardNumber, @Validated @RequestBody SearchClient client) {
-        StringBuilder response = service.completeTransaction(client,cardNumber,storehouseDatabase,clientDatabase,shoppingCartList);
+        StringBuilder response = service.completeTransaction(client,cardNumber,storehouseDatabase,clientDatabase,shoppingCartDatabase);
         return ResponseEntity.ok().body(response);
     }
 }
