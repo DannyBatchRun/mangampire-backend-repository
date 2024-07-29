@@ -19,6 +19,7 @@ public interface BackendService {
     boolean controlEnoughBalance(Card card, BigDecimal totalCart);
     Manga getAMangaFromDatabase(EndpointRequest storehouseDatabase, SearchManga searchManga);
     Client getAClientFromDatabase(EndpointRequest clientDatabase, SearchClient searchClient);
+    ShoppingCart getAShoppingCartFromDatabase(EndpointRequest shoppingCartDatabase);
     String getCardsOfTheClient(EndpointRequest clientDatabase);
     boolean addCardAndVerifyIfIsAdded(EndpointRequest clientDatabase, long idClient, Card card);
     Storehouse takeAStoreHouse(EndpointRequest storehouseDatabase, Manga manga);
@@ -28,4 +29,5 @@ public interface BackendService {
     boolean controlIfMangaIsOnStock(EndpointRequest storehouseDatabase, Manga manga);
     String checkExistingCartOrCreateIt(EndpointRequest shoppingCartDatabase, Client client);
     boolean addMangaToCart(EndpointRequest shoppingCartDatabase, Client client, Manga manga);
+    String clearCartClient(EndpointRequest shoppingCartDatabase, long idClient);
 }

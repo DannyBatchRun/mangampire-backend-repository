@@ -62,8 +62,14 @@ public class ShoppingCartController {
     @DeleteMapping("/cart/clear")
     public ResponseEntity<String> removeAllElementsInCartClient(@Validated @RequestParam long idClient) {
         ShoppingCart shoppingCart = shoppingCartService.searchShoppingCartByIdClient(idClient);
-        shoppingCartService.removeAllElementsInShoppingCart(shoppingCart);
-        return ResponseEntity.ok().body("All elements in cart are deleted");
+        if(shoppingCart == null) {
+            return ResponseEntity.ok().body("Shopping cart not found");
+        } else if(shoppingCart.getManga().isEmpty()) {
+            return ResponseEntity.ok().body("Shopping cart is still empty.");
+        } else {
+            shoppingCartService.removeAllElementsInShoppingCart(shoppingCart);
+            return ResponseEntity.ok().body("All elements in cart are deleted");
+        }
     }
 
 }

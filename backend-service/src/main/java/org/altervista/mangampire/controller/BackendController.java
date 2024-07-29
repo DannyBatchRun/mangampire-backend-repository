@@ -133,11 +133,21 @@ public class BackendController {
         return ResponseEntity.ok().body(message);
     }
     @PostMapping("/cart/search")
-    public List<Manga> getSingleCartClient(@Validated @RequestBody SearchClient client) {
+    public ShoppingCart getSingleCartClient(@Validated @RequestBody SearchClient client) {
         clientDatabase.setRequest("/client/search?showPasswordToken=no");
         Client clientFound = service.getAClientFromDatabase(clientDatabase, client);
-        List<Manga> mangaList = shoppingCartList.get(clientFound);
-        return shoppingCartList.get(clientFound);
+        shoppingCartDatabase.setRequest("/cart/search?idClient=" + clientFound.getIdClient());
+        return service.getAShoppingCartFromDatabase(shoppingCartDatabase);
+    }
+    @GetMapping("/cart/clear")
+    public Boolean clearSingleCartClient(@Validated @RequestParam long idClient) {
+        Boolean cleared = Boolean.FALSE;
+        shoppingCartDatabase.setRequest("/cart/clear?idClient=" + idClient);
+        String response = service.clearCartClient(shoppingCartDatabase, idClient);
+        if(response.equalsIgnoreCase("All elements in cart are deleted")) {
+            cleared = Boolean.TRUE;
+        }
+        return cleared;
     }
     @PostMapping("/transaction/complete")
     public ResponseEntity<StringBuilder> buyAManga(@Validated @RequestParam String cardNumber, @Validated @RequestBody SearchClient client) {

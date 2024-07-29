@@ -162,6 +162,23 @@ public class BackendServiceImpl implements BackendService {
         }
     }
     @Override
+    public ShoppingCart getAShoppingCartFromDatabase(EndpointRequest shoppingCartDatabase) {
+        try {
+            String searchShoppingCartUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+            return restTemplate.getForObject(searchShoppingCartUrl, ShoppingCart.class);
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                LOGGER.warn("Client not found: {}", e.getResponseBodyAsString());
+            } else {
+                LOGGER.error("Error while retrieving shopping cart: {} - {}", e.getStatusCode(), e.getStatusText());
+            }
+            throw e;
+        } catch (Exception e) {
+            LOGGER.error("Error while retrieving shopping cart: {}", e.getMessage());
+            throw new RuntimeException("Error while retrieving shopping cart", e);
+        }
+    }
+    @Override
     public Storehouse takeAStoreHouse(EndpointRequest storehouseDatabase, Manga manga) {
         try {
             String searchStockUrl = storehouseDatabase.getEndpoint() + storehouseDatabase.getRequest();
@@ -356,7 +373,13 @@ public class BackendServiceImpl implements BackendService {
         }
         return available;
     }
-
+    @Override
+    public String clearCartClient(EndpointRequest shoppingCartDatabase, long idClient) {
+        String clearRequest = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
+        HttpEntity<String> entity = new HttpEntity<String>("");
+        ResponseEntity<String> response = restTemplate.exchange(clearRequest, HttpMethod.DELETE, entity, String.class);
+        return response.getBody();
+    }
     public boolean addCardAndVerifyIfIsAdded(EndpointRequest clientDatabase, long idClient, Card card) {
         boolean added = false;
         clientDatabase.setRequest("/card/add?idClient=" + idClient);
