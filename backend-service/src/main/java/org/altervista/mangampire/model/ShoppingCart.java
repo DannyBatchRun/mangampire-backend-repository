@@ -7,8 +7,6 @@ import lombok.ToString;
 
 import java.util.List;
 
-@Getter
-@Setter
 @Data
 @ToString
 public class ShoppingCart {
