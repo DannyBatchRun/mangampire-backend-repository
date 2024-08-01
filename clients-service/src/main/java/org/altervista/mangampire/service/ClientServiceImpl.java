@@ -3,8 +3,8 @@ package org.altervista.mangampire.service;
 import org.altervista.mangampire.model.*;
 import org.altervista.mangampire.repository.ClientRepository;
 import org.altervista.mangampire.repository.CardRepository;
-import org.altervista.mangampire.productdto.RequestLogin;
-import org.altervista.mangampire.productdto.SearchClient;
+import org.altervista.mangampire.dto.RequestLogin;
+import org.altervista.mangampire.dto.SearchClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

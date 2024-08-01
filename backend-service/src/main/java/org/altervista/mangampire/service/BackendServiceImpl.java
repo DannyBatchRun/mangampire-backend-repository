@@ -1,13 +1,11 @@
 package org.altervista.mangampire.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.altervista.mangampire.exception.InsufficientCreditException;
-import org.altervista.mangampire.exception.NoCartItemsException;
 import org.altervista.mangampire.model.*;
-import org.altervista.mangampire.productdto.SearchManga;
+import org.altervista.mangampire.dto.SearchManga;
+import org.altervista.mangampire.dto.Transaction;
 import org.altervista.mangampire.request.EndpointRequest;
 import org.altervista.mangampire.login.RequestLogin;
-import org.altervista.mangampire.productdto.SearchClient;
+import org.altervista.mangampire.dto.SearchClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,17 +13,39 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 @Service
 public class BackendServiceImpl implements BackendService {
     @Autowired
     private static final Logger logger = LoggerFactory.getLogger(BackendService.class);
     @Autowired
     private RestTemplate restTemplate;
+    @Override
+    public HttpStatus callAndCompleteTransaction(EndpointRequest transactionService, Transaction transaction) {
+        transactionService.setRequest("/transaction/complete");
+        String transactionUrl = transactionService.getEndpoint() + transactionService.getRequest();
+        HttpEntity<Transaction> requestEntity = new HttpEntity<>(transaction);
+        ResponseEntity<String> responseEntity = restTemplate.exchange(transactionUrl, HttpMethod.POST, requestEntity, String.class);
+        return responseEntity.getStatusCode();
+    }
+    @Override
+    public StringBuilder defineResponseStatus(HttpStatus status) {
+        StringBuilder response = new StringBuilder();
+        if (status == HttpStatus.OK) {
+            logger.info("Transaction Service response: OK");
+            response.append("Transaction Service response: OK");
+        } else if (status == HttpStatus.PAYMENT_REQUIRED) {
+            logger.info("Transaction Service response: PAYMENT REQUIRED");
+            response.append("Transaction Service response: PAYMENT REQUIRED");
+        } else if (status == HttpStatus.NOT_FOUND) {
+            logger.info("Transaction Service response: NOT FOUND");
+            response.append("Transaction Service response: NOT FOUND");
+        } else {
+            logger.error("Transaction Service response: ERROR. Please refer to related microservice to debug.");
+            response.append("Transaction Service response: ERROR. Please refer to related microservice to debug.");
+        }
+        return response;
+    }
     @Override
     public boolean addClientOnDatabase(EndpointRequest clientDatabase, Client client) {
         boolean isClientAdded = false;
@@ -59,36 +79,6 @@ public class BackendServiceImpl implements BackendService {
             launchAnErrorStatement(e, "Client");
         }
         return logged;
-    }
-    @Override
-    public boolean completeTransaction (SearchClient client, String cardNumber, Map<String, EndpointRequest> services) {
-        boolean buyed = false;
-        services.get("clientDatabase").setRequest("/client/search?showPasswordToken=no");
-        Client clientFound = getAClientFromDatabase(services.get("clientDatabase"), client);
-        services.get("shoppingCartDatabase").setRequest("/cart/search?idClient=" + clientFound.getIdClient());
-        String searchShoppingCart = services.get("shoppingCartDatabase").getEndpoint() + services.get("shoppingCartDatabase").getRequest();
-        ShoppingCart shoppingCartClient = restTemplate.getForObject(searchShoppingCart, ShoppingCart.class);
-        checkShoppingCartOrCardsAreEmpty(clientFound,shoppingCartClient);
-        services.get("storehouseDatabase").setRequest("/stock/search");
-        BigDecimal totalCart = calculateCartTotal(shoppingCartClient.getManga(),services.get("storehouseDatabase"),clientFound);
-        services.get("clientDatabase").setRequest("/card/search?cardNumber=" + cardNumber);
-        Card transactionCard = takeACardFromDatabase(services.get("clientDatabase"));
-        verifySufficientCredit(cardNumber,transactionCard, totalCart);
-        services.get("storehouseDatabase").setRequest("/stock/remove");
-        buyed = finalizeTransaction(services, transactionCard, shoppingCartClient.getManga(), totalCart);
-        if(buyed) {
-            services.get("shoppingCartDatabase").setRequest("/cart/clear?idClient=" + clientFound.getIdClient());
-            String cartDeletionUrl = services.get("shoppingCartDatabase").getEndpoint() + services.get("shoppingCartDatabase").getRequest();
-            restTemplate.delete(cartDeletionUrl);
-            logger.info("Shopping cart of " + clientFound.getName() + " " + clientFound.getSurname() + " removed successfully from database");
-            logger.info("Shopping cart bought successful and credit has been scaled. Card used " + cardNumber);
-        }
-        return buyed;
-    }
-    @Override
-    public boolean controlEnoughBalance(Card card, BigDecimal totalCart) {
-       BigDecimal credit = card.getBalance();
-       return credit.compareTo(totalCart) >= 0;
     }
     @Override
     public Manga getAMangaFromDatabase(EndpointRequest storehouseDatabase, SearchManga searchManga) {
@@ -129,20 +119,6 @@ public class BackendServiceImpl implements BackendService {
         }
         return shoppingCart;
     }
-
-    @Override
-    public Card takeACardFromDatabase(EndpointRequest clientDatabase) {
-        Card cardFound = new Card();
-        try {
-            String searchCardUrl = clientDatabase.getEndpoint() + clientDatabase.getRequest();
-            cardFound = restTemplate.getForObject(searchCardUrl, Card.class);
-        } catch (HttpStatusCodeException e) {
-            getNotFoundWarningParameter(e, "Card");
-        } catch (Exception e) {
-            launchAnErrorStatement(e, "Card");
-        }
-        return cardFound;
-    }
     @Override
     public boolean addMangaToCart(EndpointRequest shoppingCartDatabase, Client client, Manga manga) {
         boolean added = false;
@@ -174,67 +150,12 @@ public class BackendServiceImpl implements BackendService {
             shoppingCartDatabase.setRequest("/cart/add");
             String additionUrl = shoppingCartDatabase.getEndpoint() + shoppingCartDatabase.getRequest();
             response = restTemplate.postForObject(additionUrl, shoppingCart, String.class);
-            message = "Cart not found. Created for idClient " + client.getIdClient() + ".";
+            logger.info("ShoppingCartService response : " + response);
         } else {
             message = "Cart found for idClient " + client.getIdClient() + ".";
         }
         return message;
     }
-    private boolean finalizeTransaction(Map<String, EndpointRequest> services, Card card, List<Manga> manga, BigDecimal totalCart) {
-        boolean buyed = false; ObjectMapper objectMapper = new ObjectMapper();
-        HttpHeaders headers = new HttpHeaders(); BigDecimal balance = card.getBalance();
-        logger.info("Current balance is " + balance);
-        BigDecimal newImport = balance.subtract(totalCart);
-        List<SearchManga> searchMangaList = new ArrayList<>();
-        String registerUrl = services.get("transactionDatabase").getEndpoint() + "/register/add";
-        for(Manga m : manga) {
-            searchMangaList.add(new SearchManga(m.getName(), m.getVolume()));
-            String response = restTemplate.postForObject(registerUrl, m, String.class);
-            logger.info(response);
-        }
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        try {
-            services.get("clientDatabase").setRequest("/card/update?newImport=" + newImport);
-            String transactionUrl = services.get("clientDatabase").getEndpoint() + services.get("clientDatabase").getRequest();
-            Card cardUpdated = restTemplate.postForObject(transactionUrl, card, Card.class);
-            logger.info("Full card updated is " + cardUpdated);
-            logger.info("Card updated with newImport : " + newImport);
-            for(SearchManga sm : searchMangaList) {
-                String requestBody = objectMapper.writeValueAsString(sm);
-                String stockRemoveUrl = services.get("storehouseDatabase").getEndpoint() + services.get("storehouseDatabase").getRequest();
-                HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
-                ResponseEntity<String> responseEntity = restTemplate.exchange(stockRemoveUrl, HttpMethod.DELETE, requestEntity, String.class);
-                String response = responseEntity.toString(); response = response.substring(0, response.indexOf("IDManga"));
-                logger.info("Response from Storehouse Service : " + response.trim());
-            }
-            buyed = true;
-        } catch (HttpStatusCodeException e) {
-            getNotFoundWarningParameter(e, "Something");
-        } catch (Exception e) {
-            launchAnErrorStatement(e, "Something");
-        }
-        return buyed;
-    }
-    private boolean checkIfMangaIsOnStock(EndpointRequest storehouseDatabase, Manga manga) {
-        boolean inStock = false;
-        try {
-            String searchStockUrl = storehouseDatabase.getEndpoint() + storehouseDatabase.getRequest();
-            Storehouse storehouse = restTemplate.postForObject(searchStockUrl, manga, Storehouse.class);
-            int quantity = storehouse.getQuantity();
-            if(quantity <= 0 || manga.getQuantity() <= quantity) {
-                logger.error("Manga " + manga.getName() + " Volume " + manga.getVolume() + " is not in stock. Interrupting process.");
-            } else {
-                logger.info("Manga " + manga.getName() + " Volume " + manga.getVolume() + "is available. Current stock : " + storehouse.getQuantity());
-                inStock = true;
-            }
-        } catch (HttpStatusCodeException e) {
-            getNotFoundWarningParameter(e, "Stock");
-        } catch (Exception e) {
-            launchAnErrorStatement(e, "Stock");
-        }
-        return inStock;
-    }
-
     @Override
     public String checkIfEmailIsExisting(EndpointRequest clientDatabase, RequestLogin requestLogin) {
         String isOnDatabase;
@@ -283,6 +204,7 @@ public class BackendServiceImpl implements BackendService {
         ResponseEntity<String> response = restTemplate.exchange(clearRequest, HttpMethod.DELETE, entity, String.class);
         return response.getBody();
     }
+    @Override
     public boolean addCardAndVerifyIfIsAdded(EndpointRequest clientDatabase, long idClient, Card card) {
         boolean added = false;
         clientDatabase.setRequest("/card/add?idClient=" + idClient);
@@ -290,49 +212,6 @@ public class BackendServiceImpl implements BackendService {
         String message = restTemplate.postForObject(additionUrl, card, String.class);
         added = !message.equalsIgnoreCase("Card already exists on database") && !message.contains("There is no client with id");
         return added;
-    }
-    private BigDecimal calculateCartTotal(List<Manga> mangaCartClient, EndpointRequest storehouseDatabase, Client client) throws NoCartItemsException {
-        boolean isOnStock = false;
-        BigDecimal totalCart = new BigDecimal("0.0");
-        if(mangaCartClient == null || mangaCartClient.isEmpty()) {
-            logger.error("There is no manga to buy for client " + client.getName() + " " + client.getSurname());
-            throw new NoCartItemsException();
-        } else {
-            for(Manga m : mangaCartClient) {
-                logger.info("Check if " + m.getName() + " Volume " + m.getVolume() + " is available on stock...");
-                isOnStock = checkIfMangaIsOnStock(storehouseDatabase, m);
-                if(isOnStock) {
-                    logger.warn("Manga " + m.getName() + " Volume " + m.getVolume() + " is out of stock at the moment.");
-                } else {
-                    logger.info("Manga " + m.getName() + " Volume " + m.getVolume() + " is available.");
-                    BigDecimal totalQuantity = multiplyByMangaQuantity(m);
-                    totalCart = totalCart.add(totalQuantity);
-                }
-            }
-        }
-        logger.info("Total Cart of Client " + client.getName() + " " + client.getSurname() + " is " + totalCart + "€. Checking credit of the card...");
-        return totalCart;
-    }
-    private void verifySufficientCredit(String cardNumber, Card transactionCard, BigDecimal totalCart) throws InsufficientCreditException {
-        boolean enoughCredit = controlEnoughBalance(transactionCard, totalCart);
-        if (!enoughCredit) {
-            logger.warn("Credit Card N° " + cardNumber + " has no enough credit for buy total cart " + totalCart + "€. Interrupting...");
-            throw new InsufficientCreditException();
-        } else {
-            logger.warn("Credit Card is available. A Transaction is in progress.");
-        }
-    }
-    private BigDecimal multiplyByMangaQuantity(Manga manga) {
-        BigDecimal price = BigDecimal.valueOf(manga.getPrice());
-        BigDecimal quantity = BigDecimal.valueOf(manga.getQuantity());
-        return price.multiply(quantity);
-    }
-    private void checkShoppingCartOrCardsAreEmpty(Client client, ShoppingCart shoppingCartClient) {
-        if(shoppingCartClient == null || shoppingCartClient.getManga().isEmpty()) {
-            logger.warn("Client " + client.getName() + " " + client.getSurname() + " has shopping Cart Empty.");
-        } else if (client.getCardQuantity() <= 0) {
-            logger.warn("Client " + client.getName() + " " + client.getSurname() + " has no cards.");
-        }
     }
     private void getNotFoundWarningParameter(HttpStatusCodeException e, String notFound) {
         if (e.getStatusCode() == HttpStatus.NOT_FOUND) {

@@ -1,8 +1,8 @@
 package org.altervista.mangampire.controller;
 
 import org.altervista.mangampire.model.*;
-import org.altervista.mangampire.productdto.RequestLogin;
-import org.altervista.mangampire.productdto.SearchClient;
+import org.altervista.mangampire.dto.RequestLogin;
+import org.altervista.mangampire.dto.SearchClient;
 import org.altervista.mangampire.service.ClientService;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,15 +15,12 @@ import java.util.*;
 
 @RestController
 public class ClientController {
-
     @Autowired
     private ClientService service;
-
     @GetMapping("/health")
     public String getHealth() {
         return "Service is up and running";
     }
-
     @GetMapping("/client/all")
     public ResponseEntity<String> getAllClients() {
         List<Client> clients = service.getClients();

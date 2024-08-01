@@ -1,12 +1,8 @@
-package org.altervista.mangampire.productdto;
+package org.altervista.mangampire.dto;
 
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 
 @Data
-@Getter
-@Setter
 public class SearchClient {
 
     private long idClient;

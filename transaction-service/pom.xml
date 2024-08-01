@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>org.altervista</groupId>
 	<artifactId>mangampire-transaction-service</artifactId>
-	<version>1.0.0</version>
+	<version>0.0.1</version>
 	<name>mangampire-transaction-service</name>
 	<description>Mangampire Example Project - Transaction Service</description>
 	<properties>
@@ -46,10 +46,9 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-			<version>2.2.224</version>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.30</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

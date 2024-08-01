@@ -1,4 +1,4 @@
-package org.altervista.mangampire.productdto;
+package org.altervista.mangampire.dto;
 
 import lombok.Data;
 import lombok.Getter;

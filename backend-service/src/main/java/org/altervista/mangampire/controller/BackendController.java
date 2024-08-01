@@ -1,13 +1,16 @@
 package org.altervista.mangampire.controller;
 
 import org.altervista.mangampire.login.RequestLogin;
+import org.altervista.mangampire.dto.SearchClient;
+import org.altervista.mangampire.dto.SearchClientManga;
+import org.altervista.mangampire.dto.Transaction;
 import org.altervista.mangampire.request.EndpointRequest;
-import org.altervista.mangampire.productdto.*;
 import org.altervista.mangampire.model.*;
 import org.altervista.mangampire.service.BackendService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -151,14 +154,14 @@ public class BackendController {
         return cleared;
     }
     @PostMapping("/transaction/complete")
-    public ResponseEntity<StringBuilder> buyAManga(@Validated @RequestParam String cardNumber, @Validated @RequestBody SearchClient client) {
-        StringBuilder response = new StringBuilder();
-        boolean transactionCompleted = service.completeTransaction(client,cardNumber,services);
-        if(transactionCompleted) {
-            response.append("Transaction for ").append(client.getName()).append(" ").append(client.getSurname()).append(" completed.");
-        } else {
-            response.append("Something went wrong with ").append(client.getName()).append(" ").append(client.getSurname()).append(" transaction.");
-        }
+    public ResponseEntity<StringBuilder> callTransactionService(@Validated @RequestParam String cardNumber, @Validated @RequestBody SearchClient client) {
+        Transaction transaction = new Transaction();
+        transaction.setCardNumber(cardNumber);
+        transaction.setClient(client);
+        transaction.setServices(services);
+        HttpStatus status = service.callAndCompleteTransaction(services.get("transactionDatabase"), transaction);
+        StringBuilder response = service.defineResponseStatus(status);
         return ResponseEntity.ok().body(response);
     }
+
 }

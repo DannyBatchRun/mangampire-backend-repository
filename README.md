@@ -7,6 +7,7 @@ Questo repository è parte di una serie di microservizi di esempio per il funzio
 - <strong>clients-transaction</strong> : microservizio database in grado di gestire clienti e carte associate.<br />
 - <strong>backend-service</strong> : microservizio principale che gestisce le operazioni di manga-storehouse e clients-transaction. E' in grado inoltre di gestire il lato del carrello del cliente e di completare le transazioni di una carta esistente.<br />
 - <strong>shopping-cart</strong> : microservizio database in grado di gestire in modo persistente, un carrello di un cliente. Può essere registrato sia vuoto che pieno di articoli da acquistare.<br />
+- <strong>transaction-service</strong> : microservizio database in grado di gestire registri sui publisher e completamenti della transazione sui carrelli del cliente.<br />
 
 Per utilizzare questo microservizio, occorre effettuare una serie di passaggi :<br />
 - <strong>Clona il progetto</strong> con il comando <strong>git clone</strong>.<br />
@@ -22,6 +23,7 @@ This repository is part of a series of example microservices for running an exam
 - <strong>clients-transaction</strong> : database microservice capable of managing customers and associated cards.<br />
 - <strong>backend-service</strong> : main micro-service that manages the manga-storehouse and clients-transaction operations. It is also able to manage the shopping cart side of the client and complete transactions of an existing card.
 - <strong>shopping-cart</strong> : microservizio database in grado di gestire in modo persistente, un carrello di un cliente. It can be registered either empty or full of articles to be purchased.<br />
+- <strong>transaction-service</strong> : database microservice capable of managing publisher logs and transaction completions on customer shopping carts.<br/>
 <br />
 To use this microservice, a series of steps must be performed:<br />
 <br />

@@ -1,5 +1,6 @@
 package org.altervista.mangampire.model;
 
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -10,9 +11,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import java.math.BigDecimal;
 
-@Entity
-@Getter
-@Setter
+@Data
 @ToString
 public class Card {
 

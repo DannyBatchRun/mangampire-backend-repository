@@ -3,11 +3,8 @@ package org.altervista.mangampire.model;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-
 import java.util.Set;
 
-@Getter
-@Setter
 @Data
 public class Manga {
 
@@ -20,6 +17,7 @@ public class Manga {
 
     private String publisher;
     private double price;
+    private int quantity;
 
     public Manga() {
 
@@ -41,4 +39,7 @@ public class Manga {
     }
 
 
+    public boolean getRestricted() {
+        return restricted;
+    }
 }
